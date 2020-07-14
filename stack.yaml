@@ -1,0 +1,8 @@
+flags: {}
+nix:
+  enable: false
+packages:
+- .
+extra-deps:
+- network-2.6.3.6
+resolver: lts-13.2
