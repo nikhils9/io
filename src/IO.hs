@@ -39,6 +39,13 @@ unsafeReadInt = read
 -- 'Maybe' result instead. Define a safe version of
 -- 'readInt' by using it.
 
+-- |
+-- >>> readInt "42"
+-- Just 42
+--
+-- >>> readInt "I am not an Int."
+-- Nothing
+--
 readInt :: String -> Maybe Int
 readInt = error "TODO: implement readInt"
 
