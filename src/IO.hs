@@ -330,6 +330,13 @@ httpTest' = error "TODO: implement httpTest'"
 -- dns package. The Hackage documentation contains an example
 -- of how it can be used, which involves calling other functions
 -- from that package as well.
+--
+-- To make CI tests pass, use 'googleNameServer' (provided belowe)
+-- for the 'resolvInfo' field of your 'ResolvConf'. Locally, you can
+-- use the default 'ResolvConf'.
+
+googleNameServer :: FileOrNumericHost
+googleNameServer = RCHostName "8.8.8.8"
 
 dnsTest :: IO (Either DNSError [IPv4])
 dnsTest = error "TODO: define dnsTest"
