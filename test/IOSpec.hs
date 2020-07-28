@@ -1,12 +1,14 @@
 {-# LANGUAGE BangPatterns #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module IOSpec
     ( spec
     ) where
 
 import           Control.Concurrent               (threadDelay)
 import           Control.Concurrent.Async
-import           Control.Exception
+import           Control.Exception                hiding (assert)
 import           Data.IORef
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as M
@@ -15,6 +17,8 @@ import           Statistics.Distribution
 import           Statistics.Distribution.Binomial (binomial)
 import           System.Process
 import           Test.Hspec
+import           Test.QuickCheck
+import           Test.QuickCheck.Monadic
 
 import           IO
 
@@ -40,6 +44,8 @@ spec = do
         it "should work with README.md" $ wc "README.md" `shouldReturn` (3, 16, 101)
     describe "testTwoDice" $
         it "should give the expected distribution for 1000000 tosses" $ testTwoDice 1000000 1e-7
+    describe "dice & diceRange" $
+        it "are compatible" $ property prop_Dice
     describe "httpTest" $
         it "should return an HTTP 200" $ testHttp httpTest
     describe "httpTest'" $
@@ -166,6 +172,45 @@ testTwoDice n e = go `shouldReturn` True
         h <- histogram n
         let (l, u) = getExpectedInterval n e
         return $ all (\i -> i >= l && i <= u) h
+
+instance Arbitrary Dice where
+
+    arbitrary = sized $ \s -> do
+        if s <= 2 then
+            oneof [ D <$> chooseInt (-2, 3) <*> chooseInt (-2, 3)
+                  , Const <$> arbitrary
+                  ]
+        else do
+            s1 <- chooseInt (1, s - 2)
+            let s2 = s - 1 - s1
+            oneof [ D <$> chooseInt (-2, 3) <*> chooseInt (-2, 3)
+                  , Const <$> arbitrary
+                  , Plus <$> resize s1 arbitrary <*> resize s2 arbitrary
+                  ]
+
+    shrink (D q d)    = [D q' d | q' <- shrink q] ++
+                        [D q d' | d' <- shrink d]
+    shrink (Const i)  = Const <$> shrink i
+    shrink (Plus x y) = x :
+                        y :
+                        [Plus x' y | x' <- shrink x] ++
+                        [Plus x y' | y' <- shrink y]
+
+prop_Dice :: Dice -> Property
+prop_Dice d = monadicIO $ do
+    let (l, u) = diceRange d
+    go l u False False 10000000
+  where
+    go :: Int -> Int -> Bool -> Bool -> Int -> PropertyM IO Bool
+    go l u bl bu n
+        | n <= 0    = return False
+        | otherwise = do
+            x <- run $ dice d
+            assert $ (x >= l) && (x <= u)
+            let bl' = bl || x == l
+                bu' = bu || x == u
+            if bl' && bu' then return True
+                          else go l u bl' bu' $ pred n
 
 testHttp :: IO [String] -> Expectation
 testHttp a = head <$> a `shouldReturn` "HTTP/1.1 200 OK\r"
