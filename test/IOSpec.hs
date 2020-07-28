@@ -15,8 +15,8 @@ import IO
 spec :: Spec
 spec = do
     describe "readLnMaybe" $ do
-        it "parses an Int" $ testReadLnMaybe "42" `shouldReturn` Right "Just 42"
-        it "returns Nothing if it can't parse an Int" $ testReadLnMaybe "I'm not an Int." `shouldReturn` Right "Nothing"
+        it "parses an Int" $ testReadLnMaybe "42" (Just 42)
+        it "returns Nothing if it can't parse an Int" $ testReadLnMaybe "I'm not an Int." Nothing
     describe "sumTwo" $ do
         it "works for 17 and 13" $ testSumTwo 17 13
         it "works for 1 and 99" $ testSumTwo 1 99
@@ -24,6 +24,12 @@ spec = do
         it "works with incrementing an IORef 100 times" $ testReplicateM 100
         it "works with incrementing an IORef zero times" $ testReplicateM 0
         it "works with incrementing an IORef (-42) times" $ testReplicateM (-42)
+    describe "sumMany" $ do
+        it "should work with twenty numbers" $ testSumMany [1 .. 20]
+        it "should work with zero numbers" $ testSumMany []
+    describe "sumMany'" $ do
+        it "should work with ten numbers" $ testSumMany' [1 .. 10]
+        it "should work with zero numbers" $ testSumMany' []
 
 newtype Timeout = Timeout DiffTime deriving Show
 
@@ -49,13 +55,8 @@ cabalRun t n xs = do
         Left ex -> Left $ show ex
         Right s -> Right $ lines s
 
-testReadLnMaybe :: String -> IO (Either String String)
-testReadLnMaybe s = do
-    e <- cabalRun 20 "readLnMaybe" [s]
-    return $ case e of
-        Left ex       -> Left ex
-        Right []      -> Left "no output"
-        Right (l : _) -> Right l
+testReadLnMaybe :: String -> Maybe Int -> Expectation
+testReadLnMaybe s m = cabalRun 20 "readLnMaybe" [s] `shouldReturn` Right [show m]
 
 testSumTwo :: Int -> Int -> Expectation
 testSumTwo m n =
@@ -74,3 +75,37 @@ testReplicateM n = go `shouldReturn` Right [1 .. n]
         replicateM n $ do
             modifyIORef ref succ
             readIORef ref
+
+testSumMany :: [Int] -> Expectation
+testSumMany xs = go `shouldReturn` Right expected
+  where
+    n :: Int
+    n = length xs
+
+    inputs :: [String]
+    inputs = show <$> n : xs
+
+    go :: IO (Either String [String])
+    go = cabalRun 20 "sumMany1" inputs
+
+    expected :: [String]
+    expected = "How many numbers do you want to add?" :
+               replicate n "Enter next number:" ++
+               ["The sum of all numbers is " ++ show (sum xs) ++ "."]
+
+testSumMany' :: [Int] -> Expectation
+testSumMany' xs = go `shouldReturn` Right expected
+  where
+    n :: Int
+    n = length xs
+
+    inputs :: [String]
+    inputs = show <$> n : xs
+
+    go :: IO (Either String [String])
+    go = cabalRun 20 "sumMany2" inputs
+
+    expected :: [String]
+    expected = "How many numbers do you want to add?" :
+               map (\i -> "Enter number " ++ show i ++ " of " ++ show n ++ ":") [1 .. n] ++
+               ["The sum of all numbers is " ++ show (sum xs) ++ "."]

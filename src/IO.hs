@@ -135,6 +135,9 @@ sumMany = error "TODO: define sumMany"
 -- Hint: You cannot use 'replicateM' for this. But perhaps
 -- you can still find higher-order functions that work?
 
+sumMany' :: IO ()
+sumMany' = error "TODO: define sumMany'"
+
 -- Task IO-8.
 --
 -- Define a function akin to the Unix utility wc (word count) that for a

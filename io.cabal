@@ -67,3 +67,19 @@ executable sumTwo
                      , io
   ghc-options:         -Wall
   default-language:    Haskell2010
+
+executable sumMany1
+  hs-source-dirs:      app
+  main-is:             sumMany1.hs
+  build-depends:       base >= 4.7 && < 5
+                     , io
+  ghc-options:         -Wall
+  default-language:    Haskell2010
+
+executable sumMany2
+  hs-source-dirs:      app
+  main-is:             sumMany2.hs
+  build-depends:       base >= 4.7 && < 5
+                     , io
+  ghc-options:         -Wall
+  default-language:    Haskell2010
