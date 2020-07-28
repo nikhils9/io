@@ -1,16 +1,22 @@
+{-# LANGUAGE BangPatterns #-}
+
 module IOSpec
     ( spec
     ) where
 
-import Control.Concurrent       (threadDelay)
-import Control.Concurrent.Async
-import Control.Exception
-import Data.IORef
-import Data.Time.Clock          (DiffTime)
-import System.Process
-import Test.Hspec
+import           Control.Concurrent               (threadDelay)
+import           Control.Concurrent.Async
+import           Control.Exception
+import           Data.IORef
+import           Data.Map.Strict                  (Map)
+import qualified Data.Map.Strict                  as M
+import           Data.Time.Clock                  (DiffTime)
+import           Statistics.Distribution
+import           Statistics.Distribution.Binomial (binomial)
+import           System.Process
+import           Test.Hspec
 
-import IO
+import           IO
 
 spec :: Spec
 spec = do
@@ -32,6 +38,8 @@ spec = do
         it "should work with zero numbers" $ testSumMany' []
     describe "wc" $
         it "should work with README.md" $ wc "README.md" `shouldReturn` (3, 16, 101)
+    describe "testTwoDice" $
+        it "should give the expected distribution for 1000000 tosses" $ testTwoDice 1000000 1e-7
 
 newtype Timeout = Timeout DiffTime deriving Show
 
@@ -112,3 +120,43 @@ testSumMany' xs = go `shouldReturn` Right expected
                map (\i -> "Enter number " ++ show i ++ " of " ++ show n ++ ":") [1 .. n] ++
                ["The sum of all numbers is " ++ show (sum xs) ++ "."]
 
+getExpectedInterval :: Int -> Double -> (Int, Int)
+getExpectedInterval n e = (lowerBound, upperBound)
+  where
+    d = binomial n $ 1 / 36
+    e2 = e / 2
+
+    lowerBound :: Int
+    lowerBound = go 0 0
+      where
+        go s i =
+            let p   = probability d i
+                !s' = s + p
+            in  if s' > e2 then i else go s' $ succ i
+
+    upperBound :: Int
+    upperBound = go 0 n
+      where
+        go s i =
+            let p   = probability d i
+                !s' = s + p
+            in  if s' > e2 then i else go s' $ pred i
+
+histogram :: Int -> IO [Int]
+histogram n = go M.empty n
+  where
+    go :: Map (Int, Int) Int -> Int -> IO [Int]
+    go m 0 = return $ (\xy -> M.findWithDefault 0 xy m) <$> [(x, y) | x <- [1..6], y <- [1..6]]
+    go !m !i = do
+        xy <- twoDice
+        let m' = M.alter (maybe (Just 1) (Just . succ)) xy m
+        go m' $ pred i
+
+testTwoDice :: Int -> Double -> Expectation
+testTwoDice n e = go `shouldReturn` True
+  where
+    go :: IO Bool
+    go = do
+        h <- histogram n
+        let (l, u) = getExpectedInterval n e
+        return $ all (\i -> i >= l && i <= u) h

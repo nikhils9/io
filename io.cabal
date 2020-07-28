@@ -19,7 +19,6 @@ library
                      , iproute
                      , network
                      , random
-
   default-language:    Haskell2010
   ghc-options:         -Wall
 
@@ -31,10 +30,12 @@ test-suite io-tests
   other-modules:       IOSpec
   build-depends:       async
                      , base >= 4.7 && < 5
+                     , containers
                      , hspec
                      , io
                      , process
                      , QuickCheck
+                     , statistics
                      , time
   build-tool-depends:  hspec-discover:hspec-discover
   default-language:    Haskell2010

@@ -174,6 +174,9 @@ wc = error "TODO: define wc"
 -- that the random number generator should produce. The 'Int' type is
 -- an instance of the 'Random' class.
 
+twoDice :: IO (Int, Int)
+twoDice = error "TODO: define twoDice"
+
 -- Task IO-10.
 --
 -- The following datatype defines the abstract syntax of a language
