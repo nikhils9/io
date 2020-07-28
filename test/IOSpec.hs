@@ -10,14 +10,17 @@ import           Control.Concurrent               (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Exception                hiding (assert)
 import           Data.IORef
+import           Data.List                        (permutations)
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as M
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 import           Data.Time.Clock                  (DiffTime)
 import           Statistics.Distribution
 import           Statistics.Distribution.Binomial (binomial)
 import           System.Process
 import           Test.Hspec
-import           Test.QuickCheck
+import           Test.QuickCheck                  hiding (shuffle)
 import           Test.QuickCheck.Monadic
 
 import           IO
@@ -46,6 +49,10 @@ spec = do
         it "should give the expected distribution for 1000000 tosses" $ testTwoDice 1000000 1e-7
     describe "dice & diceRange" $
         it "are compatible" $ property prop_Dice
+    describe "shuffle" $ do
+        it "produces all permutations of a list with three elements" $ prop_shuffle 3 10000
+        it "produces all permutations of a list with five elements" $ prop_shuffle 5 10000
+        it "produces all permutations of an empty list" $ prop_shuffle 0 10
     describe "httpTest" $
         it "should return an HTTP 200" $ testHttp httpTest
     describe "httpTest'" $
@@ -211,6 +218,23 @@ prop_Dice d = monadicIO $ do
                 bu' = bu || x == u
             if bl' && bu' then return True
                           else go l u bl' bu' $ pred n
+
+prop_shuffle :: Int -> Int -> Property
+prop_shuffle m n = monadicIO $ do
+    go ps n
+  where
+    ps :: Set [Int]
+    ps = S.fromList $ permutations [1 .. m]
+
+    go :: Set [Int] -> Int -> PropertyM IO Bool
+    go s i
+        | i <= 0    = return False
+        | otherwise = do
+            xs <- run $ shuffle [1 .. m]
+            assert $ S.member xs ps
+            let s' = S.delete xs s
+            if S.null s' then return True
+                         else go s' $ pred i
 
 testHttp :: IO [String] -> Expectation
 testHttp a = head <$> a `shouldReturn` "HTTP/1.1 200 OK\r"
