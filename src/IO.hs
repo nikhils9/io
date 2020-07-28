@@ -8,6 +8,7 @@ import Prelude hiding (readLn)
 import Control.Monad (liftM)
 import Data.Char
 import Data.IP
+import Network       (HostName, PortID)
 import Network.DNS
 import System.IO
 
@@ -277,12 +278,12 @@ shuffle = error "TODO: define shuffle"
 --
 --   hClose :: Handle -> IO ()
 --
--- Write an IO action that connects to the Haskell web
--- server at www.haskell.org on port 80 and sends the
+-- Write an IO action that connects to the Example domain at
+-- example.com on port 80 and sends the
 -- following two lines followed by an empty line:
 --
 --   GET /index.html HTTP/1.1
---   Host: www.haskell.org
+--   Host: example.com
 --
 -- Then use the helper function 'hGetLines' below to
 -- read the response.
@@ -311,6 +312,12 @@ hGetLines h = do
 -- occurs.
 --
 -- Then rewrite 'httpTest' to use 'withConnection'.
+
+withConnection :: HostName -> PortID -> (Handle -> IO r) -> IO r
+withConnection = error "TODO: implement withConnection"
+
+httpTest' :: IO [String]
+httpTest' = error "TODO: implement httpTest'"
 
 -- Task IO-14.
 --

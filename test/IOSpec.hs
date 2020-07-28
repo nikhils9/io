@@ -40,6 +40,10 @@ spec = do
         it "should work with README.md" $ wc "README.md" `shouldReturn` (3, 16, 101)
     describe "testTwoDice" $
         it "should give the expected distribution for 1000000 tosses" $ testTwoDice 1000000 1e-7
+    describe "httpTest" $
+        it "should return an HTTP 200" $ testHttp httpTest
+    describe "httpTest'" $
+        it "should return an HTTP 200" $ testHttp httpTest'
 
 newtype Timeout = Timeout DiffTime deriving Show
 
@@ -160,3 +164,6 @@ testTwoDice n e = go `shouldReturn` True
         h <- histogram n
         let (l, u) = getExpectedInterval n e
         return $ all (\i -> i >= l && i <= u) h
+
+testHttp :: IO [String] -> Expectation
+testHttp a = head <$> a `shouldReturn` "HTTP/1.1 200 OK\r"
