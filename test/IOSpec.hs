@@ -30,6 +30,8 @@ spec = do
     describe "sumMany'" $ do
         it "should work with ten numbers" $ testSumMany' [1 .. 10]
         it "should work with zero numbers" $ testSumMany' []
+    describe "wc" $
+        it "should work with README.md" $ wc "README.md" `shouldReturn` (3, 16, 101)
 
 newtype Timeout = Timeout DiffTime deriving Show
 
@@ -109,3 +111,4 @@ testSumMany' xs = go `shouldReturn` Right expected
     expected = "How many numbers do you want to add?" :
                map (\i -> "Enter number " ++ show i ++ " of " ++ show n ++ ":") [1 .. n] ++
                ["The sum of all numbers is " ++ show (sum xs) ++ "."]
+
