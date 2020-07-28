@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module IOSpec
