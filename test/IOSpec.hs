@@ -44,6 +44,8 @@ spec = do
         it "should return an HTTP 200" $ testHttp httpTest
     describe "httpTest'" $
         it "should return an HTTP 200" $ testHttp httpTest'
+    describe "dnsTest" $
+        it "should return at least on IP address" testDns
 
 newtype Timeout = Timeout DiffTime deriving Show
 
@@ -167,3 +169,9 @@ testTwoDice n e = go `shouldReturn` True
 
 testHttp :: IO [String] -> Expectation
 testHttp a = head <$> a `shouldReturn` "HTTP/1.1 200 OK\r"
+
+testDns :: Expectation
+testDns = go `shouldReturn` True
+  where
+    go :: IO Bool
+    go = either (const False) (not . null) <$> dnsTest
