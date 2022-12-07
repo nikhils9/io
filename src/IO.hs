@@ -5,10 +5,10 @@ module IO where
 -- However, some of the exercises may require you to add
 -- additional imports.
 import Prelude hiding (readLn)
-import Control.Monad (liftM)
+import Control.Monad (liftM, liftM2)
 import Data.Char
 import Data.IP
-import Network       (HostName, PortID)
+import Network       (HostName, PortID(PortNumber), PortNumber, connectTo)
 import Network.DNS
 import System.IO
 import Text.Read
@@ -130,7 +130,7 @@ sumMany :: IO ()
 sumMany = do
   n <- putStrLn "How many numbers do you want to add?" >> readLn :: IO Int
   xs <- replicateM n (putStrLn "Enter next number:" >> readLn :: IO Int)
-  putStrLn "The sum of all numbers is " ++ show(sum xs) ++ "."
+  putStrLn $ "The sum of all numbers is " ++ show(sum xs) ++ "."
 
 -- Task IO-7.
 --
@@ -153,7 +153,7 @@ sumMany = do
 indicativeSum :: Int -> Int ->(Int -> IO a)-> IO [a]
 indicativeSum i n a
   | n <= 0 = return []
-  | _ = do
+  | otherwise = do
     x <- a (i - n + 1)
     xs <- indicativeSum i (n-1) a
     return $ x:xs
@@ -161,8 +161,8 @@ indicativeSum i n a
 sumMany' :: IO ()
 sumMany' = do
   n <- putStrLn "How many numbers do you want to add?" >> readLn :: IO Int
-  xs <- interactiveSum n n (putStrLn "Enter number " ++ show i ++ "of " ++ show n ++ ":" >> readLn :: IO Int)
-  putStrLn "The sum of all numbers is " ++ show(sum xs) ++ "."
+  xs <- indicativeSum n n (\i -> putStrLn ("Enter number " ++ show i ++ " of " ++ show n ++ ":") >> readLn :: IO Int)
+  putStrLn $ "The sum of all numbers is " ++ show(sum xs) ++ "."
 
 -- Task IO-8.
 --
@@ -181,14 +181,14 @@ type Words = Int
 type Lines = Int
 type Chars = Int
 
-wc :: FilePath -> IO (Words, Lines, Chars)
+wc :: FilePath -> IO (Lines, Words, Chars)
 wc path = do
   text <- readFile path
   let
     chars = length text
     noLines = length $ lines text
     noWords = sum $ map (length.words) (lines text)
-  return (noWords, noLines, chars)
+  return (noLines, noWords, chars)
 
 
 -- Task IO-9.
@@ -243,7 +243,9 @@ type Quantity = Int
 type Die      = Int
 
 dice :: Dice -> IO Int
-dice (D quantity die) = liftM sum $ replicateM quantity $ randomRIO (1,die)
+dice (D quantity die) 
+  | quantity <= 0 || die <= 0 = return 0
+  | otherwise = liftM sum $ replicateM quantity $ randomRIO (1, die)
 dice (Const val) = return val
 dice (Plus d1 d2) = (+) <$> (dice d1) <*> (dice d2)
 
@@ -258,9 +260,11 @@ dice (Plus d1 d2) = (+) <$> (dice d1) <*> (dice d2)
 --   diceRange (2 `D` 8 `Plus` Const 4) == (6, 20)
 
 diceRange :: Dice -> (Int, Int)
-diceRange (D quantity die) = return (quantity * 1, quantity * die)
-diceRange (Const val) = return (val, val)
-diceRange (Plus d1 d2) = liftM2 (\(a,b) (c,d) -> (a+c, b+d)) (diceRange d1) (diceRange d2)
+diceRange (D quantity die)  
+  | quantity <= 0 || die <= 0 = (0, 0)
+  | otherwise = (quantity * 1, quantity * die)
+diceRange (Const val) = (val, val)
+diceRange (Plus d1 d2) = (\(a,b) (c,d) -> (a+c, b+d)) (diceRange d1) (diceRange d2)
 
 -- Task IO-11.
 --
@@ -297,7 +301,7 @@ data Card = Card CardNumber Suit
 -- understand what it does?
 
 allCards :: [Card]
-allCards = [ Card cn s | cn <- [A ..], s <- [Clubs ..] ]
+allCards = [ Card cn s | cn <- [IO.A ..], s <- [Clubs ..] ]
 
 extract :: Int -> [a] -> (a, [a])
 extract i xs =
@@ -379,11 +383,12 @@ withConnection hostName portId action = bracket (connectTo hostName portId) hClo
 httpTest' :: IO [String]
 httpTest' = do
   withConnection "example.com" (PortNumber (80::PortNumber)) action
-  where action handle = do
-    hPutStrLn handle "GET /index.html HTTP/1.1"
-    hPutStrLn handle "Host: example.com"
-    hPutStrLn handle ""
-    hGetLines handle
+  where 
+    action handle = do
+      hPutStrLn handle "GET /index.html HTTP/1.1"
+      hPutStrLn handle "Host: example.com"
+      hPutStrLn handle ""
+      hGetLines handle
 
 -- Task IO-14.
 --
@@ -406,5 +411,5 @@ googleNameServer = RCHostName "8.8.8.8"
 
 dnsTest :: IO (Either DNSError [IPv4])
 dnsTest = do
-  rs <- makeResolvSeed googleNameServer
+  rs <- makeResolvSeed defaultResolvConf {resolvInfo = googleNameServer}
   withResolver rs $ \resolver -> lookupA resolver $ pack "seed.bitcoin.sipa.be"
