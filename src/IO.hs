@@ -5,12 +5,16 @@ module IO where
 -- However, some of the exercises may require you to add
 -- additional imports.
 import Prelude hiding (readLn)
-import Control.Monad (liftM)
+import Control.Monad (liftM, liftM2)
 import Data.Char
 import Data.IP
-import Network       (HostName, PortID)
+import Network       (HostName, PortID(PortNumber), PortNumber, connectTo)
 import Network.DNS
 import System.IO
+import Text.Read
+import System.Random
+import Control.Exception
+import Data.ByteString.Char8 (pack)
 
 -- Task IO-1.
 --
@@ -48,7 +52,7 @@ unsafeReadInt = read
 -- Nothing
 --
 readInt :: String -> Maybe Int
-readInt = error "TODO: implement readInt"
+readInt = readMaybe
 
 -- Task IO-3.
 --
@@ -59,7 +63,7 @@ readInt = error "TODO: implement readInt"
 -- Hint: Use 'liftM'.
 
 readLnMaybe :: Read a => IO (Maybe a)
-readLnMaybe = error "TODO: implement readLnMaybe"
+readLnMaybe = liftM readMaybe getLine
 
 -- Task IO-4.
 --
@@ -83,7 +87,9 @@ readLnMaybe = error "TODO: implement readLnMaybe"
 -- remember that strings are lists of characters.
 
 sumTwo :: IO ()
-sumTwo = error "TODO: define sumTwo"
+sumTwo = putStrLn "Please enter first number:" >> readLn >>= 
+  (\ n1 -> putStrLn "Please enter second number:" >> readLn >>=
+    (\ n2 -> putStrLn ("The sum of both numbers is " ++ show (n1 + n2) ++ ".")))
 
 -- Task IO-5.
 --
@@ -92,7 +98,12 @@ sumTwo = error "TODO: define sumTwo"
 -- the results in a list of n elements.
 
 replicateM :: Int -> IO a -> IO [a]
-replicateM = error "TODO: define replicateM"
+replicateM n a
+  | n <= 0 = return []
+  | otherwise = do
+      x <- a
+      xs <- replicateM (n-1) a
+      return $ x:xs
 
 -- Task IO-6.
 --
@@ -116,7 +127,10 @@ replicateM = error "TODO: define replicateM"
 -- Hint: Try to use suitable IO functions.
 
 sumMany :: IO ()
-sumMany = error "TODO: define sumMany"
+sumMany = do
+  n <- putStrLn "How many numbers do you want to add?" >> readLn :: IO Int
+  xs <- replicateM n (putStrLn "Enter next number:" >> readLn :: IO Int)
+  putStrLn $ "The sum of all numbers is " ++ show(sum xs) ++ "."
 
 -- Task IO-7.
 --
@@ -136,8 +150,19 @@ sumMany = error "TODO: define sumMany"
 -- Hint: You cannot use 'replicateM' for this. But perhaps
 -- you can still find higher-order functions that work?
 
+indicativeSum :: Int -> Int ->(Int -> IO a)-> IO [a]
+indicativeSum i n a
+  | n <= 0 = return []
+  | otherwise = do
+    x <- a (i - n + 1)
+    xs <- indicativeSum i (n-1) a
+    return $ x:xs
+
 sumMany' :: IO ()
-sumMany' = error "TODO: define sumMany'"
+sumMany' = do
+  n <- putStrLn "How many numbers do you want to add?" >> readLn :: IO Int
+  xs <- indicativeSum n n (\i -> putStrLn ("Enter number " ++ show i ++ " of " ++ show n ++ ":") >> readLn :: IO Int)
+  putStrLn $ "The sum of all numbers is " ++ show(sum xs) ++ "."
 
 -- Task IO-8.
 --
@@ -156,8 +181,15 @@ type Words = Int
 type Lines = Int
 type Chars = Int
 
-wc :: FilePath -> IO (Words, Lines, Chars)
-wc = error "TODO: define wc"
+wc :: FilePath -> IO (Lines, Words, Chars)
+wc path = do
+  text <- readFile path
+  let
+    chars = length text
+    noLines = length $ lines text
+    noWords = sum $ map (length.words) (lines text)
+  return (noLines, noWords, chars)
+
 
 -- Task IO-9.
 --
@@ -168,7 +200,7 @@ wc = error "TODO: define wc"
 --
 --   randomRIO :: Random a => (a, a) -> IO a
 --
--- from the module System.Random (which you will have to add to the
+-- from the module System.Random (which you will have to add to the 
 -- import list).
 --
 -- It takes a range as an input, i.e., the minimal and maximal value
@@ -176,7 +208,10 @@ wc = error "TODO: define wc"
 -- an instance of the 'Random' class.
 
 twoDice :: IO (Int, Int)
-twoDice = error "TODO: define twoDice"
+twoDice = do
+  firstDice <- randomRIO (1,6)
+  secondDice <- randomRIO (1,6)
+  return (firstDice, secondDice)
 
 -- Task IO-10.
 --
@@ -208,7 +243,11 @@ type Quantity = Int
 type Die      = Int
 
 dice :: Dice -> IO Int
-dice = error "TODO: implement dice"
+dice (D quantity die) 
+  | quantity <= 0 || die <= 0 = return 0
+  | otherwise = liftM sum $ replicateM quantity $ randomRIO (1, die)
+dice (Const val) = return val
+dice (Plus d1 d2) = (+) <$> (dice d1) <*> (dice d2)
 
 -- Task IO-10.
 --
@@ -221,7 +260,11 @@ dice = error "TODO: implement dice"
 --   diceRange (2 `D` 8 `Plus` Const 4) == (6, 20)
 
 diceRange :: Dice -> (Int, Int)
-diceRange = error "TODO: implement diceRange"
+diceRange (D quantity die)  
+  | quantity <= 0 || die <= 0 = (0, 0)
+  | otherwise = (quantity * 1, quantity * die)
+diceRange (Const val) = (val, val)
+diceRange (Plus d1 d2) = (\(a,b) (c,d) -> (a+c, b+d)) (diceRange d1) (diceRange d2)
 
 -- Task IO-11.
 --
@@ -258,10 +301,24 @@ data Card = Card CardNumber Suit
 -- understand what it does?
 
 allCards :: [Card]
-allCards = [ Card cn s | cn <- [minBound ..], s <- [minBound ..] ]
+allCards = [ Card cn s | cn <- [IO.A ..], s <- [Clubs ..] ]
+
+extract :: Int -> [a] -> (a, [a])
+extract i xs =
+    let 
+        x1 = take i xs
+        rem = drop i xs
+        x = head rem
+        x2 = tail rem
+    in (x, x1 ++ x2)
 
 shuffle :: [a] -> IO [a]
-shuffle = error "TODO: define shuffle"
+shuffle [] = return []
+shuffle xs = do
+    i <- randomRIO (0, length xs - 1)
+    let (x,ys) = extract i xs
+    zs <- shuffle ys
+    return $ x:zs 
 
 -- Task IO-12.
 --
@@ -289,7 +346,14 @@ shuffle = error "TODO: define shuffle"
 -- read the response.
 
 httpTest :: IO [String]
-httpTest = error "TODO: implement httpTest"
+httpTest = do
+  handle <- connectTo "example.com" (PortNumber (80::PortNumber))
+  hPutStrLn handle "GET /index.html HTTP/1.1"
+  hPutStrLn handle "Host: example.com"
+  hPutStrLn handle ""
+  response <- hGetLines handle
+  hClose handle
+  return response
 
 hGetLines :: Handle -> IO [String]
 hGetLines h = do
@@ -314,10 +378,17 @@ hGetLines h = do
 -- Then rewrite 'httpTest' to use 'withConnection'.
 
 withConnection :: HostName -> PortID -> (Handle -> IO r) -> IO r
-withConnection = error "TODO: implement withConnection"
+withConnection hostName portId action = bracket (connectTo hostName portId) hClose action
 
 httpTest' :: IO [String]
-httpTest' = error "TODO: implement httpTest'"
+httpTest' = do
+  withConnection "example.com" (PortNumber (80::PortNumber)) action
+  where 
+    action handle = do
+      hPutStrLn handle "GET /index.html HTTP/1.1"
+      hPutStrLn handle "Host: example.com"
+      hPutStrLn handle ""
+      hGetLines handle
 
 -- Task IO-14.
 --
@@ -339,4 +410,6 @@ googleNameServer :: FileOrNumericHost
 googleNameServer = RCHostName "8.8.8.8"
 
 dnsTest :: IO (Either DNSError [IPv4])
-dnsTest = error "TODO: define dnsTest"
+dnsTest = do
+  rs <- makeResolvSeed defaultResolvConf {resolvInfo = googleNameServer}
+  withResolver rs $ \resolver -> lookupA resolver $ pack "seed.bitcoin.sipa.be"
